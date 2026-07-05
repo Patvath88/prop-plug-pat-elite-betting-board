@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from html import escape
 from urllib.parse import quote
@@ -614,6 +615,107 @@ def render_tracker(now: datetime) -> None:
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 
+def chatbot_response(prompt: str) -> str:
+    text = prompt.lower()
+    ranked = rank_picks(load_top_picks())
+    if any(term in text for term in ["avoid", "trap", "do not", "don't bet", "dont bet"]):
+        avoids = load_avoid_bets()
+        return "\n".join(
+            f"{idx}. Avoid {item.bet} ({item.matchup}, {item.start_time_et}, {fmt_odds(item.sportsbook_odds)}): {item.reason}"
+            for idx, item in enumerate(avoids, start=1)
+        )
+    if "parlay" in text:
+        parlay = load_moneyline_parlay()
+        legs = "\n".join(
+            f"- {leg.leg} ({leg.league}, {leg.start_time_et}) at {fmt_odds(leg.estimated_odds)}: {leg.reason}"
+            for leg in parlay.legs
+        )
+        return f"Best strict parlay: {fmt_odds(parlay.estimated_odds)}, {parlay.combined_probability:.1f}% combined probability, risk {parlay.risk_rating}.\n\n{legs}"
+    if "tracker" in text or "profit" in text or "loss" in text or "record" in text:
+        history = pd.DataFrame([pick.model_dump() for pick in load_pick_history()])
+        total = float(history["profit_units"].sum()) if not history.empty else 0.0
+        wins = int((history["result"] == "Win").sum()) if not history.empty else 0
+        losses = int((history["result"] == "Loss").sum()) if not history.empty else 0
+        pushes = int((history["result"] == "Push").sum()) if not history.empty else 0
+        return f"Tracked all-time performance: {format_units(total)} ({wins}W-{losses}L-{pushes}P). Check the Tracker tab for yearly, monthly, weekly, and yesterday splits."
+    if "mlb" in text and ("hit" in text or "rbi" in text or "run" in text):
+        hits = "\n".join(
+            f"- {pick.player} 1+ hit ({pick.team} vs {pick.opponent}, {pick.start_time_et}): {pick.hit_probability:.1f}%, {pick.grade.value}. {pick.reasoning}"
+            for pick in load_hit_picks()
+        )
+        hrr = "\n".join(
+            f"- {pick.player} hit/run/RBI ({pick.team} vs {pick.opponent}, {pick.start_time_et}): {pick.probability:.1f}%, {pick.grade.value}. {pick.reasoning}"
+            for pick in load_hrr_picks()
+        )
+        return f"MLB hit props:\n{hits}\n\nMLB hit/run/RBI props:\n{hrr}"
+    if "bankroll" in text or "stake" in text or "$" in text:
+        amounts = [float(match) for match in re.findall(r"\$?(\d+(?:\.\d+)?)", prompt)]
+        if amounts:
+            bankroll = max(amounts)
+            unit = bankroll * 0.01
+            return f"With a ${bankroll:,.0f} bankroll, 1u = ${unit:,.2f}. A+ max is about 1.25u (${unit * 1.25:,.2f}); A plays around 1u; B+ leans around 0.5u."
+        return "Use 1u as roughly 1% of bankroll, 0.25u-0.5u for leans, 1u for strong A plays, and 1.25u only for the strongest A+ edges."
+    lines = []
+    for idx, pick in enumerate(ranked[:10], start=1):
+        lines.append(
+            f"{idx}. {pick.selection} ({pick.league}, {pick.start_time_et}) - {pick.grade.value}, "
+            f"{pick.confidence:.1f}/10 confidence, {pick.probability:.1f}% probability, {pick.edge:.1f}% edge, stake {pick.recommended_stake}."
+        )
+    return "Top ranked plays right now:\n" + "\n".join(lines)
+
+
+def render_chatbot_view() -> None:
+    st.markdown(
+        """
+        <div class="hero">
+            <div class="eyebrow">Prop Plug Pat</div>
+            <h1>Sports Betting AI Chatbot</h1>
+            <div class="subtle">Ask for best bets, avoids, parlays, staking, MLB props, or unit tracking. Uses the current board data without paid API calls.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if st.button("Back to Elite Betting Board", use_container_width=True):
+        st.query_params.clear()
+        st.rerun()
+
+    quick_cols = st.columns(4)
+    prompts = [
+        "What are the top 5 plays?",
+        "What specific plays should I avoid?",
+        "Build the safest parlay.",
+        "Show tracker profit/loss.",
+    ]
+    for col, prompt in zip(quick_cols, prompts):
+        with col:
+            if st.button(prompt, use_container_width=True):
+                st.session_state.pending_chat_prompt = prompt
+
+    if "bet_chat_messages" not in st.session_state:
+        st.session_state.bet_chat_messages = [
+            {"role": "assistant", "content": "Welcome to the betting desk. No forced plays, no guarantees, bankroll first."}
+        ]
+    for message in st.session_state.bet_chat_messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    prompt = st.session_state.pop("pending_chat_prompt", None) or st.chat_input("Ask the betting assistant...")
+    if prompt:
+        st.session_state.bet_chat_messages.append({"role": "user", "content": prompt})
+        st.session_state.bet_chat_messages.append({"role": "assistant", "content": chatbot_response(prompt)})
+        st.rerun()
+
+    st.markdown(
+        """
+        <div class="glass" style="margin-top: 1.5rem;">
+            <strong>Responsible gambling:</strong> This assistant is for analysis and entertainment only.
+            It does not guarantee outcomes. Keep stakes disciplined and never chase losses.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def main() -> None:
     inject_css()
     scheduled_refresh()
@@ -636,8 +738,13 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
+    if st.query_params.get("view") == "assistant":
+        render_chatbot_view()
+        return
+
     if st.button("Open Sports Betting AI Chatbot", use_container_width=True):
-        st.switch_page("pages/Betting_AI_Assistant.py")
+        st.query_params["view"] = "assistant"
+        st.rerun()
 
     action_cols = st.columns([1, 1, 1, 1])
     with action_cols[0]:

@@ -242,8 +242,14 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
-    if st.button("Back to Elite Betting Board", use_container_width=True):
-        st.switch_page("app.py")
+    st.markdown(
+        '<a href="./" target="_self" style="display:block;text-align:center;'
+        'padding:0.75rem 1rem;margin:0.5rem 0 1rem;border-radius:8px;'
+        'background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;'
+        'font-weight:800;text-decoration:none;border:1px solid rgba(255,255,255,0.16);">'
+        'Back to Elite Betting Board</a>',
+        unsafe_allow_html=True,
+    )
 
     quick_cols = st.columns(4)
     quick_prompts = [
