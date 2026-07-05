@@ -636,14 +636,8 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        '<a href="./Betting_AI_Assistant" target="_self" style="display:block;text-align:center;'
-        'padding:0.75rem 1rem;margin:0.5rem 0 1rem;border-radius:8px;'
-        'background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;'
-        'font-weight:800;text-decoration:none;border:1px solid rgba(255,255,255,0.16);">'
-        'Open Sports Betting AI Chatbot</a>',
-        unsafe_allow_html=True,
-    )
+    if st.button("Open Sports Betting AI Chatbot", use_container_width=True):
+        st.switch_page("pages/Betting_AI_Assistant.py")
 
     action_cols = st.columns([1, 1, 1, 1])
     with action_cols[0]:
