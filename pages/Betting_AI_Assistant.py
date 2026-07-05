@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
+from services.betting_chat import chatbot_response
 from services.mock_data import (
     load_avoid_bets,
     load_hit_picks,
@@ -170,62 +171,7 @@ def bankroll_answer(message: str) -> str:
 
 
 def answer_user(message: str, context: dict) -> str:
-    text = message.lower()
-    ranked = context["ranked"]
-
-    if any(word in text for word in ["avoid", "trap", "do not", "don't bet", "dont bet"]):
-        return "Specific plays to avoid right now:\n\n" + avoid_lines(context["avoid"])
-
-    if any(word in text for word in ["tracker", "profit", "loss", "p/l", "units", "record"]):
-        return "Current tracked unit performance:\n\n" + tracker_summary(context["history"])
-
-    if "parlay" in text:
-        parlay = context["parlay"]
-        legs = "\n".join(
-            f"- {leg.leg} ({leg.league}, {leg.start_time_et}) at {fmt_odds(leg.estimated_odds)}: {leg.reason}"
-            for leg in parlay.legs
-        )
-        removes = ", ".join(parlay.safer_removes) or "No removal suggested."
-        return (
-            f"Best strict moneyline parlay: {fmt_odds(parlay.estimated_odds)}, "
-            f"{parlay.combined_probability:.1f}% combined probability, risk {parlay.risk_rating}.\n\n"
-            f"{legs}\n\nSafer-card remove: {removes}"
-        )
-
-    if "mlb" in text and ("hit" in text or "hrr" in text or "rbi" in text or "run" in text):
-        hits = "\n".join(
-            f"- {p.player} 1+ hit ({p.team} vs {p.opponent}, {p.start_time_et}): {p.hit_probability:.1f}%, {p.grade.value}. {p.reasoning}"
-            for p in context["hit_picks"]
-        )
-        hrr = "\n".join(
-            f"- {p.player} hit/run/RBI ({p.team} vs {p.opponent}, {p.start_time_et}): {p.probability:.1f}%, {p.grade.value}. {p.reasoning}"
-            for p in context["hrr_picks"]
-        )
-        return f"Best MLB hit props:\n{hits}\n\nBest MLB hit/run/RBI props:\n{hrr}"
-
-    if any(word in text for word in ["bankroll", "stake", "unit", "wager", "$"]):
-        return bankroll_answer(message)
-
-    if "wnba" in text:
-        picks = [pick for pick in ranked if pick.league == "WNBA"]
-        return "WNBA board:\n\n" + (pick_lines(picks) if picks else "No WNBA play meets the current threshold.")
-
-    if "world cup" in text or "fifa" in text or "soccer" in text:
-        picks = [pick for pick in ranked if pick.league == "FIFA World Cup"]
-        return "FIFA World Cup board:\n\n" + (pick_lines(picks) if picks else "No World Cup play meets the current threshold.")
-
-    if "tennis" in text or "wta" in text:
-        picks = [pick for pick in ranked if pick.league == "WTA"]
-        return "WTA/Tennis board:\n\n" + (pick_lines(picks) if picks else "No tennis play meets the current threshold.")
-
-    if "best" in text or "top" in text or "today" in text or "pick" in text:
-        return "Top ranked plays right now:\n\n" + pick_lines(ranked, limit=10)
-
-    return (
-        "I can help with best bets, sport-specific cards, MLB hit props, parlays, do-not-bet traps, "
-        "bankroll sizing, and unit tracking. Try asking: 'What are the top 5 plays?', "
-        "'What should I avoid?', 'Build the safest parlay', or 'My bankroll is $500, what should I stake?'"
-    )
+    return chatbot_response(message)
 
 
 def main() -> None:
