@@ -13,6 +13,7 @@ A premium Streamlit sports betting dashboard with mock data, ranked picks, simul
 - FIFA World Cup match-card parlays
 - Specific do-not-bet plays with matchup, odds, start time, trap type, and pass reason
 - Pick tracker for all-time, yearly, monthly, weekly, and yesterday's unit P/L
+- Linked Sports Betting AI Chatbot page for best bets, avoid plays, parlays, staking, MLB props, and tracker questions
 - Mock MLB, soccer, and WNBA simulation module
 - API adapter placeholders for odds, MLB, WNBA, soccer, weather, injuries, and lineups
 - Eastern Time refresh schedule for 9am, 12pm, 2pm, 6pm, and 7pm

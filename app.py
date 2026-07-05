@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-import socket
-import subprocess
-import sys
 from datetime import datetime, timedelta
 from html import escape
-from pathlib import Path
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
@@ -291,95 +287,6 @@ def card_metric(label: str, value: str, note: str = "") -> None:
         """,
         unsafe_allow_html=True,
     )
-
-
-DUEL_PORT = 8008
-
-
-def duel_server_running(port: int = DUEL_PORT) -> bool:
-    try:
-        with socket.create_connection(("127.0.0.1", port), timeout=0.25):
-            return True
-    except OSError:
-        return False
-
-
-def get_lan_url(port: int = DUEL_PORT) -> str | None:
-    try:
-        host = socket.gethostbyname(socket.gethostname())
-    except OSError:
-        return None
-    if not host or host.startswith("127."):
-        return None
-    return f"http://{host}:{port}"
-
-
-def start_duel_server(port: int = DUEL_PORT) -> tuple[bool, str]:
-    if duel_server_running(port):
-        return True, "Duel server is already running."
-
-    root = Path(__file__).resolve().parent
-    log_path = root / "duel_server.log"
-    command = [
-        sys.executable,
-        "-m",
-        "uvicorn",
-        "duel_server:app",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        str(port),
-    ]
-    try:
-        log_file = log_path.open("a", encoding="utf-8")
-        kwargs = {"cwd": root, "stdout": log_file, "stderr": subprocess.STDOUT}
-        if sys.platform.startswith("win"):
-            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-        subprocess.Popen(command, **kwargs)
-    except Exception as exc:
-        return False, f"Could not start duel server: {exc}"
-
-    for _ in range(12):
-        if duel_server_running(port):
-            return True, "Duel server started."
-    return False, f"Duel server did not answer yet. Check {log_path.name}."
-
-
-def render_duel_simulator_launcher() -> None:
-    local_url = f"http://127.0.0.1:{DUEL_PORT}"
-    lan_url = get_lan_url(DUEL_PORT)
-    running = duel_server_running(DUEL_PORT)
-    status = "Online" if running else "Stopped"
-    status_class = "grade-aplus" if running else "grade-no-play"
-
-    st.markdown(
-        f"""
-        <div class="glass pick-card">
-            <div class="mini-title">Manual Yu-Gi-Oh Duel Simulator</div>
-            <span class="badge {status_class}">{status}</span>
-            <span class="badge">Rooms</span>
-            <span class="badge">Bots</span>
-            <span class="badge">Local card image cache</span>
-            <p class="subtle">Manual table, unrestricted card movement, preset decks, simple bot turns, room links, chat, LP, phases, graveyard, banished, extra deck, and card search.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    cols = st.columns([1, 1, 1, 1])
-    with cols[0]:
-        if st.button("Start Duel Server", use_container_width=True):
-            ok, message = start_duel_server(DUEL_PORT)
-            if ok:
-                st.success(message)
-            else:
-                st.error(message)
-    with cols[1]:
-        st.link_button("Open Duel Table", local_url, use_container_width=True)
-    with cols[2]:
-        st.code(local_url, language=None)
-    with cols[3]:
-        st.code(lan_url or "LAN URL unavailable", language=None)
 
 
 def render_pick_card(index: int, pick) -> None:
@@ -729,7 +636,14 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    render_duel_simulator_launcher()
+    st.markdown(
+        '<a href="./Betting_AI_Assistant" target="_self" style="display:block;text-align:center;'
+        'padding:0.75rem 1rem;margin:0.5rem 0 1rem;border-radius:8px;'
+        'background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;'
+        'font-weight:800;text-decoration:none;border:1px solid rgba(255,255,255,0.16);">'
+        'Open Sports Betting AI Chatbot</a>',
+        unsafe_allow_html=True,
+    )
 
     action_cols = st.columns([1, 1, 1, 1])
     with action_cols[0]:
