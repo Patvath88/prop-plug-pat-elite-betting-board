@@ -6,6 +6,7 @@ from .schemas import (
     MoneylineLeg,
     Parlay,
     Pick,
+    SettledPick,
     SimulationResult,
     WorldCupMatchCard,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "MoneylineLeg",
     "Parlay",
     "Pick",
+    "SettledPick",
     "SimulationResult",
     "WorldCupMatchCard",
 ]

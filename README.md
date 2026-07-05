@@ -5,11 +5,14 @@ A premium Streamlit sports betting dashboard with mock data, ranked picks, simul
 ## What is included
 
 - Top 10 best bets ranked by grade, confidence, probability, and edge
+- Sport and league tabs for MLB, WNBA, FIFA World Cup, WTA/Tennis, parlays, simulations, avoid plays, and tracker
+- Player/team images and listed ET start times on pick cards
 - Best MLB 1+ hit picks
 - Best MLB 1+ hit/run/RBI picks
 - High-confidence moneyline parlay builder
 - FIFA World Cup match-card parlays
-- Bets to avoid
+- Specific do-not-bet plays with matchup, odds, start time, trap type, and pass reason
+- Pick tracker for all-time, yearly, monthly, weekly, and yesterday's unit P/L
 - Mock MLB, soccer, and WNBA simulation module
 - API adapter placeholders for odds, MLB, WNBA, soccer, weather, injuries, and lineups
 - Eastern Time refresh schedule for 9am, 12pm, 2pm, 6pm, and 7pm

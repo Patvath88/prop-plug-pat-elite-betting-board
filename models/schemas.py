@@ -25,8 +25,13 @@ GRADE_SCORE = {
 
 class Pick(BaseModel):
     sport: str
+    league: str
     market: str
     selection: str
+    matchup: str
+    start_time_et: str
+    image_url: str
+    image_alt: str
     grade: BetGrade
     confidence: float = Field(ge=1, le=10)
     probability: float = Field(ge=0, le=100)
@@ -55,6 +60,8 @@ class HitPick(BaseModel):
     player: str
     team: str
     opponent: str
+    start_time_et: str
+    image_url: str
     pitcher_matchup: str
     handedness_matchup: str
     batting_order_spot: int = Field(ge=1, le=9)
@@ -69,6 +76,8 @@ class HitRunRbiPick(BaseModel):
     player: str
     team: str
     opponent: str
+    start_time_et: str
+    image_url: str
     implied_team_total: float = Field(ge=0)
     batting_order_spot: int = Field(ge=1, le=9)
     recent_form: str
@@ -82,6 +91,10 @@ class HitRunRbiPick(BaseModel):
 class MoneylineLeg(BaseModel):
     leg: str
     sport: str
+    league: str
+    matchup: str
+    start_time_et: str
+    image_url: str
     probability: float = Field(ge=0, le=100)
     estimated_odds: int
     reason: str
@@ -105,6 +118,8 @@ class Parlay(BaseModel):
 
 class WorldCupMatchCard(BaseModel):
     match: str
+    start_time_et: str
+    image_url: str
     legs: list[str]
     estimated_odds: int
     estimated_probability: float = Field(ge=0, le=100)
@@ -123,6 +138,13 @@ class WorldCupMatchCard(BaseModel):
 
 class AvoidBet(BaseModel):
     bet: str
+    sport: str
+    league: str
+    matchup: str
+    market: str
+    sportsbook_odds: int
+    start_time_et: str
+    image_url: str
     category: str
     risk: Literal["Medium", "High", "Extreme"]
     reason: str
@@ -137,3 +159,14 @@ class SimulationResult(BaseModel):
     bet_probability: float = Field(ge=0, le=100)
     confidence_rating: float = Field(ge=1, le=10)
     verdict: Literal["Supports", "Neutral", "Rejects"]
+
+
+class SettledPick(BaseModel):
+    date: str
+    sport: str
+    league: str
+    selection: str
+    odds: int
+    stake_units: float = Field(ge=0)
+    result: Literal["Win", "Loss", "Push", "Pending"]
+    profit_units: float

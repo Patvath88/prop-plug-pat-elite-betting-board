@@ -45,8 +45,11 @@ def export_board_rows(picks: list[Pick]) -> pd.DataFrame:
     rows = [
         {
             "Sport": pick.sport,
+            "League": pick.league,
             "Market": pick.market,
             "Selection": pick.selection,
+            "Matchup": pick.matchup,
+            "Start Time ET": pick.start_time_et,
             "Grade": pick.grade.value,
             "Confidence": pick.confidence,
             "Probability": pick.probability,
