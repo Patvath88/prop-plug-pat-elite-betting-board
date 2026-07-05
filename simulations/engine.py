@@ -30,14 +30,14 @@ def run_mlb_simulation(seed: int = 42) -> SimulationResult:
 def run_soccer_simulation(seed: int = 7) -> SimulationResult:
     rng = np.random.default_rng(seed)
     brazil_goals = rng.poisson(lam=1.85, size=10000)
-    croatia_goals = rng.poisson(lam=0.78, size=10000)
-    brazil_or_draw = float(np.mean(brazil_goals >= croatia_goals) * 100)
+    norway_goals = rng.poisson(lam=0.98, size=10000)
+    brazil_or_draw = float(np.mean(brazil_goals >= norway_goals) * 100)
     return SimulationResult(
         sport="Soccer",
-        matchup="Brazil vs Croatia",
-        most_likely_outcomes=["Brazil 2-0", "Brazil 1-0", "Draw 1-1"],
-        probability_distribution=_distribution(["Brazil win", "Draw", "Croatia win"], [56, 24, 20]),
-        projected_score="Brazil 1.85, Croatia 0.78",
+        matchup="Brazil vs Norway",
+        most_likely_outcomes=["Brazil 2-1", "Brazil 1-0", "Draw 1-1"],
+        probability_distribution=_distribution(["Brazil win", "Draw", "Norway win"], [54, 24, 22]),
+        projected_score="Brazil 1.85, Norway 0.98",
         bet_probability=round(brazil_or_draw, 1),
         confidence_rating=8.0,
         verdict="Supports",
