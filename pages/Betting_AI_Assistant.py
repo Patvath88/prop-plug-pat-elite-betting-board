@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from services.betting_chat import chatbot_response
-from services.mock_data import (
+from services.live_board import (
     load_avoid_bets,
     load_hit_picks,
     load_hrr_picks,

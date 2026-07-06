@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from models import SimulationResult
+from services.live_feed import fetch_all_scoreboards, matchup_name, teams_for_event, today_key
 
 
 def _distribution(labels: list[str], weights: list[float]) -> dict[str, float]:
@@ -10,56 +11,84 @@ def _distribution(labels: list[str], weights: list[float]) -> dict[str, float]:
     return {label: round(weight / total * 100, 1) for label, weight in zip(labels, weights)}
 
 
-def run_mlb_simulation(seed: int = 42) -> SimulationResult:
+def _simulation_for_event(league: str, event: dict, seed: int) -> SimulationResult | None:
+    teams = teams_for_event(event, league)
+    if not teams:
+        return None
+    home, away = teams
     rng = np.random.default_rng(seed)
-    dodgers_runs = rng.poisson(lam=5.1, size=8000)
-    dbacks_runs = rng.poisson(lam=3.9, size=8000)
-    over_45 = float(np.mean(dodgers_runs >= 5) * 100)
-    return SimulationResult(
-        sport="MLB",
-        matchup="Dodgers vs Diamondbacks",
-        most_likely_outcomes=["Dodgers 5-4", "Dodgers 6-3", "Dodgers 4-3"],
-        probability_distribution=_distribution(["Dodgers win", "Diamondbacks win", "One-run game"], [58, 42, 29]),
-        projected_score="Dodgers 5.1, Diamondbacks 3.9",
-        bet_probability=round(over_45, 1),
-        confidence_rating=8.1,
-        verdict="Supports",
-    )
+    home_strength = max(0.2, home.rating / 100)
+    away_strength = max(0.2, away.rating / 100)
 
+    if league == "MLB":
+        home_runs = rng.poisson(lam=3.2 + home_strength * 2.1, size=6000)
+        away_runs = rng.poisson(lam=3.2 + away_strength * 2.1, size=6000)
+        home_win = float(np.mean(home_runs > away_runs) * 100)
+        return SimulationResult(
+            sport="MLB",
+            matchup=matchup_name(event, league),
+            most_likely_outcomes=[
+                f"{home.display_name} by 1",
+                f"{away.display_name} by 1",
+                "One-run game",
+            ],
+            probability_distribution=_distribution([f"{home.display_name} win", f"{away.display_name} win", "One-run game"], [home_win, 100 - home_win, 28]),
+            projected_score=f"{home.display_name} {np.mean(home_runs):.1f}, {away.display_name} {np.mean(away_runs):.1f}",
+            bet_probability=round(max(home_win, 100 - home_win), 1),
+            confidence_rating=round(min(9.0, 5.5 + abs(home_win - 50) / 8), 1),
+            verdict="Supports" if abs(home_win - 50) >= 8 else "Neutral",
+        )
 
-def run_soccer_simulation(seed: int = 7) -> SimulationResult:
-    rng = np.random.default_rng(seed)
-    brazil_goals = rng.poisson(lam=1.85, size=10000)
-    norway_goals = rng.poisson(lam=0.98, size=10000)
-    brazil_or_draw = float(np.mean(brazil_goals >= norway_goals) * 100)
-    return SimulationResult(
-        sport="Soccer",
-        matchup="Brazil vs Norway",
-        most_likely_outcomes=["Brazil 2-1", "Brazil 1-0", "Draw 1-1"],
-        probability_distribution=_distribution(["Brazil win", "Draw", "Norway win"], [54, 24, 22]),
-        projected_score="Brazil 1.85, Norway 0.98",
-        bet_probability=round(brazil_or_draw, 1),
-        confidence_rating=8.0,
-        verdict="Supports",
-    )
+    if league == "WNBA":
+        home_pts = rng.normal(loc=73 + home_strength * 18, scale=10, size=6000)
+        away_pts = rng.normal(loc=73 + away_strength * 18, scale=10, size=6000)
+        home_win = float(np.mean(home_pts > away_pts) * 100)
+        return SimulationResult(
+            sport="WNBA",
+            matchup=matchup_name(event, league),
+            most_likely_outcomes=[
+                f"{home.display_name} by 4",
+                f"{away.display_name} by 4",
+                "Single-digit margin",
+            ],
+            probability_distribution=_distribution([f"{home.display_name} win", f"{away.display_name} win", "OT/coin-flip finish"], [home_win, 100 - home_win, 3]),
+            projected_score=f"{home.display_name} {np.mean(home_pts):.1f}, {away.display_name} {np.mean(away_pts):.1f}",
+            bet_probability=round(max(home_win, 100 - home_win), 1),
+            confidence_rating=round(min(9.0, 5.5 + abs(home_win - 50) / 8), 1),
+            verdict="Supports" if abs(home_win - 50) >= 8 else "Neutral",
+        )
 
-
-def run_wnba_simulation(seed: int = 18) -> SimulationResult:
-    rng = np.random.default_rng(seed)
-    aces = rng.normal(loc=87, scale=10, size=7000)
-    opponent = rng.normal(loc=80, scale=11, size=7000)
-    win_probability = float(np.mean(aces > opponent) * 100)
-    return SimulationResult(
-        sport="WNBA",
-        matchup="Aces vs Sun",
-        most_likely_outcomes=["Aces by 7", "Aces by 4", "Aces by 11"],
-        probability_distribution=_distribution(["Aces win", "Sun win", "Overtime"], [70, 28, 2]),
-        projected_score="Aces 87, Sun 80",
-        bet_probability=round(win_probability, 1),
-        confidence_rating=8.7,
-        verdict="Supports",
-    )
+    if league == "FIFA World Cup":
+        home_goals = rng.poisson(lam=0.8 + home_strength * 1.1, size=8000)
+        away_goals = rng.poisson(lam=0.8 + away_strength * 1.1, size=8000)
+        home_win = float(np.mean(home_goals > away_goals) * 100)
+        draw = float(np.mean(home_goals == away_goals) * 100)
+        away_win = 100 - home_win - draw
+        return SimulationResult(
+            sport="Soccer",
+            matchup=matchup_name(event, league),
+            most_likely_outcomes=[
+                f"{home.display_name} 1-1 {away.display_name}",
+                f"{home.display_name} 2-1 {away.display_name}",
+                f"{away.display_name} 2-1 {home.display_name}",
+            ],
+            probability_distribution=_distribution([f"{home.display_name} win", "Draw", f"{away.display_name} win"], [home_win, draw, away_win]),
+            projected_score=f"{home.display_name} {np.mean(home_goals):.2f}, {away.display_name} {np.mean(away_goals):.2f}",
+            bet_probability=round(max(home_win, draw, away_win), 1),
+            confidence_rating=round(min(8.5, 5.2 + max(home_win, draw, away_win) / 15), 1),
+            verdict="Neutral",
+        )
+    return None
 
 
 def run_all_simulations() -> list[SimulationResult]:
-    return [run_mlb_simulation(), run_soccer_simulation(), run_wnba_simulation()]
+    boards = fetch_all_scoreboards(today_key())
+    sims: list[SimulationResult] = []
+    seed = 11
+    for league in ("MLB", "WNBA", "FIFA World Cup"):
+        for event in boards.get(league, {}).get("events", [])[:2]:
+            sim = _simulation_for_event(league, event, seed)
+            seed += 1
+            if sim:
+                sims.append(sim)
+    return sims

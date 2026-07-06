@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from services.mock_data import (
+from services.live_board import (
     load_avoid_bets,
     load_hit_picks,
     load_hrr_picks,
@@ -267,6 +267,11 @@ def chatbot_response(prompt: str) -> str:
         )
 
     if "mlb" in text and ("hit" in text or "hrr" in text or "rbi" in text or "run" in text):
+        if not load_hit_picks() and not load_hrr_picks():
+            return (
+                "No Play on MLB player props right now. The live public feed does not expose verified hitter prop "
+                "odds or confirmed batting orders, so I will not invent 1+ hit, run, or RBI picks."
+            )
         hits = "\n".join(
             f"- {pick.player} 1+ hit ({pick.team} vs {pick.opponent}, {pick.start_time_et}): "
             f"{pick.hit_probability:.1f}%, {pick.grade.value}. {pick.reasoning}"
@@ -296,6 +301,6 @@ def chatbot_response(prompt: str) -> str:
 
     return (
         "Ask me a specific betting question and I will answer it directly. For example: "
-        "'Should I bet Dodgers full-game ML?', 'What about Brazil vs Norway over 2.5?', "
+        "'Should I bet the Dodgers ML?', 'What about USA vs Belgium over 2.5?', "
         "'Give me WNBA only', 'What should I avoid?', or 'My bankroll is $500, what should I stake?'"
     )
