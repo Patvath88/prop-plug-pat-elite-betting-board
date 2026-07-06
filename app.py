@@ -17,6 +17,7 @@ from services.live_board import (
     load_hit_picks,
     load_hrr_picks,
     load_moneyline_parlay,
+    load_parlay_ladder,
     load_pick_history,
     load_top_picks,
     load_world_cup_cards,
@@ -359,6 +360,112 @@ def render_leaderboard(title: str, picks: list) -> None:
     render_score_plot(picks)
     for index, pick in enumerate(picks, start=1):
         render_pick_card(index, pick)
+
+
+def hit_rate_label(frame: pd.DataFrame) -> tuple[str, str]:
+    if frame.empty:
+        return "0/0", "No graded picks yet"
+    graded = frame[frame["result"].isin(["Win", "Loss"])]
+    if graded.empty:
+        return "0/0", "No graded picks yet"
+    wins = int((graded["result"] == "Win").sum())
+    total = int(len(graded))
+    return f"{wins}/{total}", f"{wins / total * 100:.1f}% hit rate"
+
+
+def render_success_snapshot(now: datetime) -> None:
+    st.subheader("Success Rate")
+    history = load_pick_history()
+    if history:
+        df = pd.DataFrame([pick.model_dump() for pick in history])
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+    else:
+        df = pd.DataFrame(columns=["date", "result", "profit_units"])
+
+    today = now.date()
+    yesterday = today - timedelta(days=1)
+    windows = [
+        ("All Time", df),
+        ("YTD", df[df["date"] >= today.replace(month=1, day=1)] if not df.empty else df),
+        ("MTD", df[df["date"] >= today.replace(day=1)] if not df.empty else df),
+        ("Yesterday", df[df["date"] == yesterday] if not df.empty else df),
+    ]
+    html = '<div class="tracker-grid">'
+    for label, frame in windows:
+        record, rate = hit_rate_label(frame)
+        profit = float(frame["profit_units"].sum()) if not frame.empty and "profit_units" in frame else 0.0
+        html += (
+            '<div class="glass metric-card">'
+            f'<div class="metric-label">{safe(label)}</div>'
+            f'<div class="metric-value">{safe(record)}</div>'
+            f'<div class="subtle">{safe(rate)} | {format_units(profit)}</div>'
+            "</div>"
+        )
+    html += "</div>"
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def parlay_record_label(parlay) -> str:
+    created_today = 1 if parlay.legs else 0
+    return f"0 hit / 0 placed | {created_today} created today"
+
+
+def render_top_three_home(ranked: list) -> None:
+    st.subheader("Top 3 Picks Of The Day")
+    top_three = [pick for pick in ranked if pick.grade.value != "No Play"][:3]
+    if not top_three:
+        st.markdown('<div class="glass no-play"><strong>No Play</strong><br>No verified top-3 edge cleared the live threshold.</div>', unsafe_allow_html=True)
+        return
+    for index, pick in enumerate(top_three, start=1):
+        render_pick_card(index, pick)
+
+
+def render_parlay_card(title: str, parlay, record: str) -> None:
+    if not parlay.legs:
+        st.markdown(
+            f"""
+            <div class="glass no-play">
+                <div class="mini-title">{safe(title)}</div>
+                <span class="badge grade-no-play">No Play</span>
+                <span class="badge">{safe(record)}</span>
+                <p>No live parlay cleared the confidence threshold for this risk bucket.</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+    legs = "".join(
+        f"<li><strong>{safe(leg.leg)}</strong> <span class='subtle'>({safe(leg.league)}, {safe(leg.start_time_et)}, {fmt_odds(leg.estimated_odds)})</span></li>"
+        for leg in parlay.legs
+    )
+    st.markdown(
+        f"""
+        <div class="glass pick-card">
+            <div class="mini-title">{safe(title)}</div>
+            <span class="badge">{safe(parlay.risk_rating)}</span>
+            <span class="badge">{safe(record)}</span>
+            <span class="badge">{parlay.combined_probability:.1f}% combined</span>
+            <span class="badge">Est. {fmt_odds(parlay.estimated_odds)}</span>
+            <ul>{legs}</ul>
+            <p class="subtle"><strong>Safer removes:</strong> {safe(", ".join(parlay.safer_removes) or "None")}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_home_parlays() -> None:
+    st.subheader("Parlay Ladder")
+    parlays = load_parlay_ladder()
+    cols = st.columns(3)
+    cards = [
+        ("Safe Card", parlays["safe"], "safe"),
+        ("Moderate Risk", parlays["moderate"], "moderate"),
+        ("Lotto Ticket", parlays["lotto"], "lotto"),
+    ]
+    for col, (title, parlay, key) in zip(cols, cards):
+        with col:
+            render_parlay_card(title, parlay, parlay_record_label(parlay))
 
 
 def render_hit_table(title: str, rows: list, probability_key: str) -> None:
@@ -714,8 +821,12 @@ def main() -> None:
     with action_cols[3]:
         card_metric("Next Auto Refresh", fmt_et(next_refresh), "9a, 12p, 2p, 6p, 7p")
 
+    render_top_three_home(ranked)
+    render_success_snapshot(now)
+    render_home_parlays()
+
     if len(ranked) < 10:
-        st.warning("No weak picks were forced. The board is showing only plays that met the current mock confidence and edge threshold.")
+        st.warning("No weak picks were forced. The board is showing only plays that met the current live confidence and edge threshold.")
 
     league_tabs = st.tabs(
         [

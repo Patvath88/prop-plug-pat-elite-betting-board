@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import csv
+from pathlib import Path
+
 from models import AvoidBet, BetGrade, HitPick, HitRunRbiPick, MoneylineLeg, Parlay, Pick, SettledPick, WorldCupMatchCard
 from services.live_feed import (
     SPORT_NAMES,
@@ -229,9 +232,14 @@ def load_hrr_picks() -> list[HitRunRbiPick]:
 
 
 def load_moneyline_parlay() -> Parlay:
+    parlays = load_parlay_ladder()
+    return parlays["moderate"]
+
+
+def _build_parlay_from_picks(picks: list[Pick], risk_rating: str, max_legs: int, min_legs: int) -> Parlay:
     legs = []
-    for pick in load_top_picks():
-        if pick.market == "Moneyline" and pick.grade in {BetGrade.A_PLUS, BetGrade.A, BetGrade.A_MINUS} and pick.confidence >= 7.2:
+    for pick in picks:
+        if pick.market == "Moneyline":
             legs.append(
                 MoneylineLeg(
                     leg=pick.selection,
@@ -243,11 +251,11 @@ def load_moneyline_parlay() -> Parlay:
                     probability=pick.probability,
                     estimated_odds=pick.sportsbook_odds,
                     reason=pick.reasoning,
-                    removable_for_safer_card=pick.grade == BetGrade.A_MINUS,
+                    removable_for_safer_card=pick.grade in {BetGrade.A_MINUS, BetGrade.B_PLUS},
                 )
             )
-    legs = legs[:5]
-    if len(legs) < 2:
+    legs = legs[:max_legs]
+    if len(legs) < min_legs:
         return Parlay(legs=[], combined_probability=0.0, estimated_odds=0, risk_rating="No Play", safer_removes=[])
     combined_probability = 1.0
     combined_decimal = 1.0
@@ -259,9 +267,40 @@ def load_moneyline_parlay() -> Parlay:
         legs=legs,
         combined_probability=round(combined_probability * 100, 1),
         estimated_odds=decimal_to_american(combined_decimal),
-        risk_rating="Moderate" if len(legs) <= 3 else "High",
+        risk_rating=risk_rating,
         safer_removes=safer_removes,
     )
+
+
+def load_parlay_ladder() -> dict[str, Parlay]:
+    picks = [pick for pick in load_top_picks() if pick.market == "Moneyline"]
+    safe = [
+        pick
+        for pick in picks
+        if pick.grade in {BetGrade.A_PLUS, BetGrade.A}
+        and pick.confidence >= 8.2
+        and pick.probability >= 61
+        and pick.sportsbook_odds > -280
+    ]
+    moderate = [
+        pick
+        for pick in picks
+        if pick.grade in {BetGrade.A_PLUS, BetGrade.A, BetGrade.A_MINUS}
+        and pick.confidence >= 7.4
+        and pick.sportsbook_odds > -320
+    ]
+    lotto = [
+        pick
+        for pick in picks
+        if pick.grade in {BetGrade.A_PLUS, BetGrade.A, BetGrade.A_MINUS, BetGrade.B_PLUS}
+        and pick.confidence >= 6.6
+        and pick.sportsbook_odds > -400
+    ]
+    return {
+        "safe": _build_parlay_from_picks(safe, "Low", max_legs=2, min_legs=2),
+        "moderate": _build_parlay_from_picks(moderate, "Moderate", max_legs=4, min_legs=2),
+        "lotto": _build_parlay_from_picks(lotto, "High", max_legs=6, min_legs=3),
+    }
 
 
 def load_world_cup_cards() -> list[WorldCupMatchCard]:
@@ -301,7 +340,28 @@ def load_world_cup_cards() -> list[WorldCupMatchCard]:
 
 
 def load_pick_history() -> list[SettledPick]:
-    return []
+    path = Path(__file__).resolve().parents[1] / "data" / "pick_history.csv"
+    if not path.exists():
+        return []
+    picks: list[SettledPick] = []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            try:
+                picks.append(
+                    SettledPick(
+                        date=row["date"],
+                        sport=row["sport"],
+                        league=row["league"],
+                        selection=row["selection"],
+                        odds=int(float(row["odds"])),
+                        stake_units=float(row["stake_units"]),
+                        result=row["result"],
+                        profit_units=float(row["profit_units"]),
+                    )
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+    return picks
 
 
 def load_avoid_bets() -> list[AvoidBet]:

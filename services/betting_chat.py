@@ -229,7 +229,7 @@ def _specific_play_answer(text: str) -> str | None:
 
     if any(term in text.lower() for term in ["should i", "what about", "worth", "take ", "bet "]):
         return (
-            "No Play from the current board. I do not have enough edge in the mock feed to approve that bet, "
+            "No Play from the current board. I do not have enough edge in the live feed to approve that bet, "
             "and it is not one of the listed high-confidence plays. I would pass unless you can confirm a better "
             "price, clean lineup/injury news, and a projection edge."
         )
